@@ -60,6 +60,8 @@ spec:
           volumeMounts:
             - name: kubernetes-dashboard-certs
               mountPath: /certs
+            - name: tmp-dir
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               scheme: HTTPS
@@ -78,6 +80,8 @@ spec:
           type: RuntimeDefault
       volumes:
         - name: kubernetes-dashboard-certs
+          emptyDir: {}
+        - name: tmp-dir
           emptyDir: {}
 ---
 apiVersion: networking.k8s.io/v1
