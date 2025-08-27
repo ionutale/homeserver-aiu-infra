@@ -1,0 +1,199 @@
+# MetalLB installation manifest (L2 mode) pinned to v0.14.5
+# Source: https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+# Trimmed to essentials (left full manifest for simplicity & future upgrades rationale)
+# NOTE: For full production usage review upstream docs.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: controller
+  namespace: metallb-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: speaker
+  namespace: metallb-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb:controller
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "nodes", "pods", "secrets", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    verbs: ["use"]
+    resourceNames: ["metallb-allow-all"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb:speaker
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "nodes", "pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb:controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb:controller
+subjects:
+  - kind: ServiceAccount
+    name: controller
+    namespace: metallb-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb:speaker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb:speaker
+subjects:
+  - kind: ServiceAccount
+    name: speaker
+    namespace: metallb-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: metallb-system
+  name: controller
+  labels:
+    app: metallb
+    component: controller
+spec:
+  selector:
+    matchLabels:
+      app: metallb
+      component: controller
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: metallb
+        component: controller
+    spec:
+      serviceAccountName: controller
+      containers:
+        - name: controller
+          image: quay.io/metallb/controller:v0.14.5
+          args:
+            - --port=7472
+            - --log-level=info
+          ports:
+            - containerPort: 7472
+              name: monitoring
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: monitoring
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: monitoring
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: metallb-system
+  name: speaker
+  labels:
+    app: metallb
+    component: speaker
+spec:
+  selector:
+    matchLabels:
+      app: metallb
+      component: speaker
+  template:
+    metadata:
+      labels:
+        app: metallb
+        component: speaker
+    spec:
+      serviceAccountName: speaker
+      containers:
+        - name: speaker
+          image: quay.io/metallb/speaker:v0.14.5
+          args:
+            - --port=7472
+            - --log-level=info
+          env:
+            - name: METALLB_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: monitoring
+              containerPort: 7472
+          securityContext:
+            privileged: true
+---
+# CRDs required (simplified for brevity)
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: addresspools.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: AddressPool
+    plural: addresspools
+    singular: addresspool
+  scope: Namespaced
+  versions:
+    - name: v1beta1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: l2advertisements.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: L2Advertisement
+    plural: l2advertisements
+    singular: l2advertisement
+  scope: Namespaced
+  versions:
+    - name: v1beta1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object

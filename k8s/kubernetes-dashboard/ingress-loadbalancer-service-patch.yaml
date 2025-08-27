@@ -1,0 +1,11 @@
+# Patch to change ingress-nginx controller Service to LoadBalancer (if MetalLB installed) instead of NodePort.
+# Apply after MetalLB is running. This assumes the namespace ingress-nginx and service name ingress-nginx-controller.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  annotations:
+    metallb.universe.tf/address-pool: dashboard-pool
+spec:
+  type: LoadBalancer

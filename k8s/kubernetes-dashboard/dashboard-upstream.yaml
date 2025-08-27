@@ -94,7 +94,10 @@ spec:
     - Ingress
   ingress:
     - from:
+        # Allow same-namespace pods (original behavior)
         - podSelector: {}
+        # Allow pods from any namespace (enables access via ingress-controller, other namespaces, and NodePort)
+        - namespaceSelector: {}
       ports:
         - port: 8443
           protocol: TCP
