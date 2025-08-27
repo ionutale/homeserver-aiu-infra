@@ -38,7 +38,6 @@ for f in \
   admin-user.yaml \
   dashboard-nodeport-service.yaml \
   ingress.yaml \
-  ingress-loadbalancer-service-patch.yaml \
   ; do
   [[ -f "${DASHBOARD_DIR}/$f" ]] && kubectl apply -f "${DASHBOARD_DIR}/$f" || echo "(skip missing $f)"
 done
@@ -46,29 +45,33 @@ done
 step 3 "Install MetalLB core components"
 kubectl apply -f "${METALLB_DIR}/metallb-install.yaml"
 
-step 4 "Wait for MetalLB pods Ready"
-start_time=$(date +%s)
-while true; do
-  not_ready=$(kubectl -n metallb-system get pods --no-headers 2>/dev/null | awk '$2 !~ /1\\/1/ {c++} END {print c+0}') || true
-  if [[ -z "$not_ready" ]]; then
-    sleep 2; continue
-  fi
-  [[ "$not_ready" == "0" ]] && break
-  if (( $(date +%s) - start_time > TIMEOUT_SEC )); then
-    echo "ERROR: MetalLB pods not ready within ${TIMEOUT_SEC}s" >&2
-    kubectl -n metallb-system get pods || true
-    exit 1
-  fi
-  sleep 2
-done
-
-echo "MetalLB pods Ready."
+step 4 "Wait for MetalLB controller & speaker readiness"
+kubectl -n metallb-system wait --for=condition=available deployment/controller --timeout=180s 2>/dev/null || {
+  echo "WARN: controller deployment wait condition not met (continuing)" >&2
+}
+kubectl -n metallb-system rollout status ds/speaker --timeout=180s || {
+  echo "WARN: speaker daemonset rollout not fully ready (continuing)" >&2
+}
+echo "MetalLB components proceeded (check manually if issues)."
 
 step 5 "Apply MetalLB address pool & L2 advertisement"
 kubectl apply -f "${METALLB_DIR}/metallb-config.yaml"
 
-step 6 "Patch ingress controller Service to LoadBalancer (MetalLB will assign IP)"
-kubectl apply -f "${DASHBOARD_DIR}/ingress-loadbalancer-service-patch.yaml"
+step 6 "Ensure ingress controller Service type=LoadBalancer (MetalLB will assign IP)"
+if kubectl -n "${INGRESS_NS}" get svc "${INGRESS_SVC}" >/dev/null 2>&1; then
+  current_type=$(kubectl -n "${INGRESS_NS}" get svc "${INGRESS_SVC}" -o jsonpath='{.spec.type}')
+  if [[ "$current_type" != "LoadBalancer" ]]; then
+    echo "Patching service type from $current_type to LoadBalancer"
+    kubectl -n "${INGRESS_NS}" patch svc "${INGRESS_SVC}" -p '{"spec":{"type":"LoadBalancer"}}'
+  else
+    echo "Service already LoadBalancer"
+  fi
+  echo "Adding/updating MetalLB address-pool annotation"
+  kubectl -n "${INGRESS_NS}" annotate svc "${INGRESS_SVC}" metallb.universe.tf/address-pool=dashboard-pool --overwrite || true
+else
+  echo "ERROR: ingress controller service ${INGRESS_NS}/${INGRESS_SVC} not found. Install ingress-nginx first." >&2
+  exit 1
+fi
 
 step 7 "Wait for External IP on ${INGRESS_NS}/${INGRESS_SVC}"
 start_time=$(date +%s)
