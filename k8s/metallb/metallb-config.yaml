@@ -3,14 +3,13 @@
 # Example assumes LAN: 192.168.1.0/24 and reserves .240-.250 for LoadBalancer services.
 # Ensure these IPs are NOT handed out by your DHCP server.
 apiVersion: metallb.io/v1beta1
-kind: AddressPool
+kind: IPAddressPool
 metadata:
   name: dashboard-pool
   namespace: metallb-system
 spec:
   addresses:
     - 192.168.1.240-192.168.1.250
-  protocol: layer2
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
