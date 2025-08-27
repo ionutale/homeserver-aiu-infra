@@ -54,6 +54,21 @@ kubectl -n metallb-system rollout status ds/speaker --timeout=180s || {
 }
 echo "MetalLB components proceeded (check manually if issues)."
 
+# Ensure memberlist secret exists (required for MetalLB gossip in some versions)
+if ! kubectl -n metallb-system get secret memberlist >/dev/null 2>&1; then
+  step 4.1 "Create MetalLB memberlist secret"
+  if command -v openssl >/dev/null 2>&1; then
+    kubectl create secret generic -n metallb-system memberlist \
+      --from-literal=secretkey="$(openssl rand -base64 128)"
+  else
+    kubectl create secret generic -n metallb-system memberlist \
+      --from-literal=secretkey="$(head -c32 /dev/urandom | base64)"
+  fi
+  echo "Memberlist secret created."
+  echo "Restarting MetalLB pods to pick up secret (if needed)."
+  kubectl -n metallb-system delete pod -l app=metallb --ignore-not-found || true
+fi
+
 step 5 "Apply MetalLB address pool & L2 advertisement"
 kubectl apply -f "${METALLB_DIR}/metallb-config.yaml"
 
