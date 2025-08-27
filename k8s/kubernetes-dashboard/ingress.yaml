@@ -6,10 +6,11 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
-    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: dashboard-basic-auth
-    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"  # Force NGINX to talk HTTPS to service (dashboard serves TLS on 8443)
+  # Use Authelia (external auth) instead of basic auth popup
+  nginx.ingress.kubernetes.io/auth-url: "https://auth.home.lan/api/verify?rd=$request_uri"
+  nginx.ingress.kubernetes.io/auth-signin: "https://auth.home.lan/?rd=$scheme://$host$request_uri"
+  nginx.ingress.kubernetes.io/auth-response-headers: "Remote-User, Remote-Email"
+  nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
 spec:
   ingressClassName: nginx
   tls:
