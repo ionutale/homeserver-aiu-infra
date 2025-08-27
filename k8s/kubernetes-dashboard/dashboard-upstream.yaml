@@ -99,10 +99,9 @@ spec:
         - podSelector: {}
         # Allow pods from any namespace (enables access via ingress-controller, other namespaces, and NodePort)
         - namespaceSelector: {}
-    # Allow traffic originating outside the cluster (LAN). Without this, only pods are allowed and
-    # NodePort / external clients are blocked because they are not pods. Restrict to home LAN CIDR.
-    - ipBlock:
-      cidr: 192.168.1.0/24
+        # Allow traffic originating outside the cluster (LAN). Restrict to home LAN CIDR.
+        - ipBlock:
+            cidr: 192.168.1.0/24
       ports:
         - port: 8443
           protocol: TCP
