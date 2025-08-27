@@ -1,0 +1,8 @@
+# Ignore macOS artifacts
+.DS_Store
+
+# Ignore accidental password / secret files
+home-server-password
+*.secret
+*.secrets
+secrets/*.txt

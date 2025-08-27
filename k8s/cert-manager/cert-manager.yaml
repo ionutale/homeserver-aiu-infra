@@ -1,0 +1,31 @@
+# Lightweight cert-manager install (CRDs + core components). For production prefer official Helm chart.
+# Version pinned
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+---
+# (In real setups you'd apply upstream CRDs; here we assume they are applied externally if needed.)
+# Provide a self-signed ClusterIssuer for internal TLS.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-cluster-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dashboard-internal-cert
+  namespace: kubernetes-dashboard
+spec:
+  secretName: dashboard-tls
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d
+  commonName: dashboard.home.lan
+  dnsNames:
+    - dashboard.home.lan
+  issuerRef:
+    name: selfsigned-cluster-issuer
+    kind: ClusterIssuer
