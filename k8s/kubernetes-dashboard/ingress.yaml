@@ -6,7 +6,7 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
-  nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"  # Force NGINX to talk HTTPS to service (dashboard serves TLS on 8443)
 spec:
   ingressClassName: nginx
   tls:
